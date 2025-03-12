@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { X, Mic, MicOff, Video, VideoOff, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -40,7 +39,7 @@ export const CallModal = ({
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [isConnected]);
+  }, [isConnected, isOpen]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -65,23 +64,23 @@ export const CallModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
-      <div className="glass p-6 rounded-xl max-w-md w-full">
-        <div className="flex flex-col items-center gap-4">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="glass p-4 sm:p-6 rounded-xl max-w-md w-full">
+        <div className="flex flex-col items-center gap-3 sm:gap-4">
           {callType === "video" && !isVideoOff ? (
             <div className="w-full aspect-video bg-gray-900 rounded-lg flex items-center justify-center overflow-hidden">
-              <div className="text-center text-muted-foreground">
+              <div className="text-center text-muted-foreground text-sm">
                 Video preview (Placeholder)
               </div>
             </div>
           ) : (
-            <Avatar className="w-24 h-24 mb-2">
+            <Avatar className="w-20 h-20 sm:w-24 sm:h-24 mb-2">
               <img src={callerAvatar} alt={callerName} className="object-cover" />
             </Avatar>
           )}
 
           <div className="text-center">
-            <h3 className="font-bold text-xl">{callerName}</h3>
+            <h3 className="font-bold text-lg sm:text-xl">{callerName}</h3>
             {isConnected ? (
               <p className="text-sm text-muted-foreground">
                 {formatTime(callDuration)}
@@ -93,14 +92,14 @@ export const CallModal = ({
             )}
           </div>
 
-          <div className="flex gap-4 mt-4">
+          <div className="flex gap-3 sm:gap-4 mt-3 sm:mt-4">
             {isConnected ? (
               <>
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={() => setIsMuted(!isMuted)}
-                  className={`rounded-full ${isMuted ? 'bg-red-500/20 text-red-500' : ''}`}
+                  className={`rounded-full w-10 h-10 ${isMuted ? 'bg-red-500/20 text-red-500' : ''}`}
                 >
                   {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
                 </Button>
@@ -110,7 +109,7 @@ export const CallModal = ({
                     variant="outline"
                     size="icon"
                     onClick={() => setIsVideoOff(!isVideoOff)}
-                    className={`rounded-full ${isVideoOff ? 'bg-red-500/20 text-red-500' : ''}`}
+                    className={`rounded-full w-10 h-10 ${isVideoOff ? 'bg-red-500/20 text-red-500' : ''}`}
                   >
                     {isVideoOff ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
                   </Button>
@@ -120,7 +119,7 @@ export const CallModal = ({
                   variant="destructive"
                   size="icon"
                   onClick={onEnd}
-                  className="rounded-full"
+                  className="rounded-full w-10 h-10"
                 >
                   <Phone className="h-5 w-5 rotate-135" />
                 </Button>
@@ -131,7 +130,7 @@ export const CallModal = ({
                   variant="destructive"
                   size="icon"
                   onClick={onDecline}
-                  className="rounded-full"
+                  className="rounded-full w-10 h-10"
                 >
                   <Phone className="h-5 w-5 rotate-135" />
                 </Button>
@@ -139,7 +138,7 @@ export const CallModal = ({
                   variant="default"
                   size="icon"
                   onClick={handleAccept}
-                  className="rounded-full bg-green-500 hover:bg-green-600"
+                  className="rounded-full bg-green-500 hover:bg-green-600 w-10 h-10"
                 >
                   <Phone className="h-5 w-5" />
                 </Button>
@@ -149,7 +148,7 @@ export const CallModal = ({
                 variant="destructive"
                 size="icon"
                 onClick={onEnd}
-                className="rounded-full"
+                className="rounded-full w-10 h-10"
               >
                 <Phone className="h-5 w-5 rotate-135" />
               </Button>
