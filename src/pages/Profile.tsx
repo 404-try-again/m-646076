@@ -34,18 +34,21 @@ const Profile = () => {
     const fetchProfile = async () => {
       try {
         setLoading(true);
+        
+        // First check if the profile exists
         const { data, error } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", user.id)
-          .single();
+          .maybeSingle(); // Use maybeSingle instead of single to handle no rows case
 
-        if (error) {
+        if (error && error.code !== 'PGRST116') {
           console.error("Error fetching profile:", error);
           throw error;
         }
 
         if (data) {
+          // Profile exists, update state
           setProfile({
             username: data.username || "",
             full_name: data.full_name || "",
@@ -54,6 +57,35 @@ const Profile = () => {
             avatar_url: data.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${user.id}`,
             preferred_voice_input: data.preferred_voice_input || "microphone",
             call_status: data.call_status || "offline"
+          });
+        } else {
+          // Profile doesn't exist, create one
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              username: user.email?.split('@')[0] || '',
+              full_name: '',
+              avatar_url: `https://api.dicebear.com/7.x/micah/svg?seed=${user.id}`,
+              status: 'Available',
+              preferred_voice_input: 'microphone',
+              call_status: 'offline'
+            });
+
+          if (insertError) {
+            console.error("Error creating profile:", insertError);
+            throw insertError;
+          }
+
+          // Set default profile data
+          setProfile({
+            username: user.email?.split('@')[0] || "",
+            full_name: "",
+            bio: "",
+            status: "Available",
+            avatar_url: `https://api.dicebear.com/7.x/micah/svg?seed=${user.id}`,
+            preferred_voice_input: "microphone",
+            call_status: "offline"
           });
         }
       } catch (error) {
@@ -75,17 +107,22 @@ const Profile = () => {
 
     try {
       setUpdating(true);
+      
+      // Prepare the data to update
+      const updates = {
+        username: profile.username,
+        full_name: profile.full_name,
+        bio: profile.bio,
+        status: profile.status,
+        avatar_url: profile.avatar_url,
+        preferred_voice_input: profile.preferred_voice_input,
+        updated_at: new Date().toISOString()
+      };
+
+      // Update the profile in Supabase
       const { error } = await supabase
         .from("profiles")
-        .update({
-          username: profile.username,
-          full_name: profile.full_name,
-          bio: profile.bio,
-          status: profile.status,
-          avatar_url: profile.avatar_url,
-          preferred_voice_input: profile.preferred_voice_input,
-          updated_at: new Date().toISOString()
-        })
+        .update(updates)
         .eq("id", user.id);
 
       if (error) throw error;
