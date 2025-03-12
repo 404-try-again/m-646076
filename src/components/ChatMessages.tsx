@@ -1,4 +1,3 @@
-
 import { Avatar } from "@/components/ui/avatar";
 import { Check, Info, Send } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
@@ -20,7 +19,6 @@ export const ChatMessages = () => {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
-  const [currentChat, setCurrentChat] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -29,170 +27,74 @@ export const ChatMessages = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Fetch conversation data
+  // Setup basic storage for messages in localStorage until we create the messages table
   useEffect(() => {
     if (!user) return;
 
-    const fetchCurrentChat = async () => {
+    // Load messages from localStorage
+    const loadMessages = () => {
       try {
-        // For demo purposes, create or find a general chat room
-        const { data: existingConversations, error: fetchError } = await supabase
-          .from('conversations')
-          .select('*')
-          .eq('name', 'General Chat')
-          .limit(1);
-
-        if (fetchError) throw fetchError;
-
-        let chatId;
-
-        if (existingConversations && existingConversations.length > 0) {
-          chatId = existingConversations[0].id;
-          setCurrentChat(existingConversations[0]);
-        } else {
-          // Create general chat if it doesn't exist
-          const { data: newChat, error: createError } = await supabase
-            .from('conversations')
-            .insert({
-              name: 'General Chat',
-              is_group: true,
-              created_by: user.id
-            })
-            .select()
-            .single();
-
-          if (createError) throw createError;
-          chatId = newChat.id;
-          setCurrentChat(newChat);
+        const savedMessages = localStorage.getItem('chat_messages');
+        if (savedMessages) {
+          setMessages(JSON.parse(savedMessages));
         }
-
-        // Ensure user is a participant
-        const { error: participantError } = await supabase
-          .from('conversation_participants')
-          .upsert({
-            conversation_id: chatId,
-            profile_id: user.id,
-            role: 'member'
-          }, {
-            onConflict: 'conversation_id,profile_id'
-          });
-
-        if (participantError) throw participantError;
-
-        // Fetch messages
-        fetchMessages(chatId);
-
-        // Subscribe to new messages
-        const channel = supabase
-          .channel('public:messages')
-          .on('postgres_changes', 
-            { 
-              event: 'INSERT', 
-              schema: 'public', 
-              table: 'messages',
-              filter: `conversation_id=eq.${chatId}`
-            }, 
-            (payload) => {
-              const newMsg = payload.new as any;
-              // Only add if not from current user to avoid duplication
-              // (since we optimistically add sent messages)
-              if (newMsg.sender_id !== user.id) {
-                fetchUserInfo(newMsg.sender_id).then(userInfo => {
-                  setMessages(prevMessages => [
-                    ...prevMessages, 
-                    {
-                      ...newMsg,
-                      sender_name: userInfo?.username || 'Unknown',
-                      sender_avatar: userInfo?.avatar_url,
-                      timestamp: new Date(newMsg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                      read: false
-                    }
-                  ]);
-                });
-              }
-            }
-          )
-          .subscribe();
-
-        return () => {
-          supabase.removeChannel(channel);
-        };
       } catch (error) {
-        console.error("Error fetching conversation:", error);
-        toast({
-          variant: "destructive",
-          description: "Failed to load chat. Please try again.",
-        });
+        console.error("Error loading messages:", error);
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchCurrentChat();
+    loadMessages();
+
+    // We'll use Supabase's realtime functionality to simulate a chat
+    // Even though we're storing in localStorage for now
+    const channel = supabase
+      .channel('chat-updates')
+      .on('broadcast', { event: 'message' }, (payload) => {
+        const newMessage = payload.payload as Message;
+        
+        // Don't add our own messages as they're added optimistically
+        if (newMessage.sender_id !== user.id) {
+          setMessages(prevMessages => {
+            const updatedMessages = [...prevMessages, newMessage];
+            localStorage.setItem('chat_messages', JSON.stringify(updatedMessages));
+            return updatedMessages;
+          });
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   const fetchUserInfo = async (userId: string) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('username, avatar_url')
-      .eq('id', userId)
-      .single();
-    
-    return data;
-  };
-
-  const fetchMessages = async (chatId: string) => {
     try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('messages')
-        .select(`
-          id, 
-          content, 
-          sender_id,
-          created_at,
-          content_type,
-          is_edited
-        `)
-        .eq('conversation_id', chatId)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-
-      // Process messages with user info
-      const enhancedMessages = await Promise.all(
-        (data || []).map(async (msg) => {
-          const userInfo = await fetchUserInfo(msg.sender_id);
-          return {
-            id: msg.id,
-            content: msg.content,
-            sender_id: msg.sender_id,
-            sender_name: userInfo?.username || 'Unknown',
-            sender_avatar: userInfo?.avatar_url,
-            timestamp: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            read: true // Assume old messages are read
-          };
-        })
-      );
-
-      setMessages(enhancedMessages);
+      const { data } = await supabase
+        .from('profiles')
+        .select('username, avatar_url')
+        .eq('id', userId)
+        .single();
+      
+      return data;
     } catch (error) {
-      console.error("Error fetching messages:", error);
-      toast({
-        variant: "destructive",
-        description: "Failed to load messages. Please try again.",
-      });
-    } finally {
-      setLoading(false);
+      console.error("Error fetching user info:", error);
+      return null;
     }
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !user || !currentChat) return;
+    if (!newMessage.trim() || !user) return;
 
-    // Create optimistic message
-    const optimisticId = Date.now().toString();
-    const optimisticMessage: Message = {
-      id: optimisticId,
+    // Generate a unique ID for the message
+    const messageId = Date.now().toString();
+    
+    // Create the message object
+    const newMsg: Message = {
+      id: messageId,
       content: newMessage,
       sender_id: user.id,
       sender_name: user.user_metadata?.username || 'Me',
@@ -201,32 +103,31 @@ export const ChatMessages = () => {
       read: false
     };
 
-    // Add to UI immediately
-    setMessages(prev => [...prev, optimisticMessage]);
+    // Add message to state immediately (optimistic update)
+    setMessages(prev => {
+      const updatedMessages = [...prev, newMsg];
+      localStorage.setItem('chat_messages', JSON.stringify(updatedMessages));
+      return updatedMessages;
+    });
+    
     setNewMessage("");
 
     try {
-      // Send to backend
-      const { data, error } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: currentChat.id,
-          sender_id: user.id,
-          content: newMessage,
-          content_type: 'text'
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
+      // Broadcast the message to all users on the channel
+      await supabase
+        .channel('chat-updates')
+        .send({
+          type: 'broadcast',
+          event: 'message',
+          payload: newMsg
+        });
     } catch (error) {
       console.error("Error sending message:", error);
-      // Remove optimistic message and show error
-      setMessages(prev => prev.filter(msg => msg.id !== optimisticId));
+      // If broadcasting fails, keep the message in the local chat
+      // but notify the user that others might not see it
       toast({
         variant: "destructive",
-        description: "Failed to send message. Please try again.",
+        description: "Message may not be visible to others. Network issue detected.",
       });
     }
   };
@@ -251,7 +152,7 @@ export const ChatMessages = () => {
             />
           </Avatar>
           <div>
-            <div className="font-medium">{currentChat?.name || 'Loading...'}</div>
+            <div className="font-medium">General Chat</div>
             <div className="text-sm text-muted">
               {loading ? 'Loading...' : `${messages.length} messages`}
             </div>
@@ -310,12 +211,12 @@ export const ChatMessages = () => {
             className="flex-1 bg-transparent outline-none px-2"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            disabled={loading || !currentChat}
+            disabled={loading}
           />
           <button 
             type="submit"
             className="p-2 hover:bg-white/5 rounded-full transition-colors"
-            disabled={loading || !newMessage.trim() || !currentChat}
+            disabled={loading || !newMessage.trim()}
           >
             <Send className="w-5 h-5" />
           </button>
