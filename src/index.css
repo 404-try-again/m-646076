@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -33,4 +34,18 @@
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Add a dark theme to the app */
+:root {
+  --background: 240 10% 3.9%;
+  --foreground: 0 0% 98%;
+  --bubble-sent: 255 70% 50%;
+  --bubble-received: 263 34% 30%;
+}
+
+/* Update form inputs background */
+input, 
+textarea {
+  @apply bg-white/5;
 }
