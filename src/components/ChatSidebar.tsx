@@ -1,4 +1,5 @@
-import { Search, Plus, LogOut, Settings } from "lucide-react";
+
+import { Search, LogOut, Settings } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
@@ -48,12 +49,13 @@ export const ChatSidebar = () => {
       }
     };
 
-    // Fetch contacts instead of all users
+    // Fetch contacts with explicit column naming for the join
     const fetchContacts = async () => {
       const { data, error } = await supabase
         .from("contacts")
         .select(`
-          contact:contact_id(
+          contact_id,
+          profiles!contacts_contact_id_fkey(
             id,
             username,
             full_name,
@@ -66,12 +68,14 @@ export const ChatSidebar = () => {
       if (error) {
         console.error("Error fetching contacts:", error);
       } else if (data) {
-        const mappedUsers: User[] = data.map(({ contact }) => ({
-          id: contact.id,
-          name: contact.full_name || contact.username || "Anonymous User",
-          avatar: contact.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${contact.id}`,
-          status: contact.status || "Available"
-        }));
+        const mappedUsers: User[] = data
+          .filter(item => item.profiles) // Filter out any null profiles
+          .map(({ profiles }) => ({
+            id: profiles.id,
+            name: profiles.full_name || profiles.username || "Anonymous User",
+            avatar: profiles.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${profiles.id}`,
+            status: profiles.status || "Available"
+          }));
         setOnlineUsers(mappedUsers);
       }
     };

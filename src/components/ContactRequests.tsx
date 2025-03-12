@@ -23,18 +23,40 @@ export const ContactRequests = () => {
   useEffect(() => {
     const fetchRequests = async () => {
       try {
+        const { data: user } = await supabase.auth.getUser();
+        if (!user?.user?.id) return;
+
         const { data: requestsData, error } = await supabase
           .from("contact_requests")
           .select(`
             id,
             created_at,
-            sender:sender_id(id, username, avatar_url)
+            profiles!contact_requests_sender_id_fkey(
+              id, 
+              username, 
+              avatar_url
+            )
           `)
+          .eq("recipient_id", user.user.id)
           .eq("status", "pending")
           .order("created_at", { ascending: false });
 
         if (error) throw error;
-        setRequests(requestsData || []);
+
+        // Transform the data to match our interface
+        const formattedRequests: ContactRequest[] = (requestsData || [])
+          .filter(req => req.profiles) // Filter out any null sender profiles
+          .map(req => ({
+            id: req.id,
+            created_at: req.created_at,
+            sender: {
+              id: req.profiles.id,
+              username: req.profiles.username || 'Unknown User',
+              avatar_url: req.profiles.avatar_url || '',
+            }
+          }));
+
+        setRequests(formattedRequests);
       } catch (error) {
         console.error("Error fetching requests:", error);
       } finally {
