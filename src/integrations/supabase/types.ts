@@ -13,10 +13,13 @@ export type Database = {
         Row: {
           avatar_url: string | null
           bio: string | null
+          call_status: string | null
           created_at: string | null
           full_name: string | null
           id: string
+          in_call: boolean | null
           is_online: boolean | null
+          preferred_voice_input: string | null
           status: string | null
           updated_at: string | null
           username: string | null
@@ -24,10 +27,13 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           bio?: string | null
+          call_status?: string | null
           created_at?: string | null
           full_name?: string | null
           id: string
+          in_call?: boolean | null
           is_online?: boolean | null
+          preferred_voice_input?: string | null
           status?: string | null
           updated_at?: string | null
           username?: string | null
@@ -35,10 +41,13 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           bio?: string | null
+          call_status?: string | null
           created_at?: string | null
           full_name?: string | null
           id?: string
+          in_call?: boolean | null
           is_online?: boolean | null
+          preferred_voice_input?: string | null
           status?: string | null
           updated_at?: string | null
           username?: string | null

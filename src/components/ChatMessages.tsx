@@ -1,9 +1,12 @@
+
 import { Avatar } from "@/components/ui/avatar";
-import { Check, Info, Send } from "lucide-react";
+import { Check, Info, Send, Phone, Video } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { CallModal } from "@/components/CallModal";
+import { Button } from "@/components/ui/button";
 
 interface Message {
   id: string;
@@ -20,6 +23,13 @@ export const ChatMessages = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
+  const [callModalOpen, setCallModalOpen] = useState(false);
+  const [activeCall, setActiveCall] = useState<{
+    type: "audio" | "video";
+    name: string;
+    avatar: string;
+    isIncoming: boolean;
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Scroll to bottom whenever messages change
@@ -61,6 +71,19 @@ export const ChatMessages = () => {
             localStorage.setItem('chat_messages', JSON.stringify(updatedMessages));
             return updatedMessages;
           });
+        }
+      })
+      .on('broadcast', { event: 'call' }, (payload) => {
+        // Handle incoming call
+        const { callType, callerName, callerAvatar } = payload.payload as any;
+        if (payload.payload.recipient_id === user.id) {
+          setActiveCall({
+            type: callType,
+            name: callerName,
+            avatar: callerAvatar,
+            isIncoming: true
+          });
+          setCallModalOpen(true);
         }
       })
       .subscribe();
@@ -132,6 +155,71 @@ export const ChatMessages = () => {
     }
   };
 
+  const initiateCall = async (callType: "audio" | "video") => {
+    if (!user) return;
+    
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('username, full_name, avatar_url')
+      .eq('id', user.id)
+      .single();
+    
+    const callerName = profileData?.full_name || profileData?.username || 'User';
+    const callerAvatar = profileData?.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${user.id}`;
+    
+    // For demo purposes, we'll simulate a call to everyone in the general chat
+    setActiveCall({
+      type: callType,
+      name: "General Chat",
+      avatar: "https://api.dicebear.com/7.x/micah/svg?seed=general",
+      isIncoming: false
+    });
+    
+    setCallModalOpen(true);
+    
+    // Broadcast that we're initiating a call
+    await supabase
+      .channel('chat-updates')
+      .send({
+        type: 'broadcast',
+        event: 'call',
+        payload: {
+          callType,
+          callerName,
+          callerAvatar,
+          caller_id: user.id,
+          recipient_id: 'general' // In a real app, this would be a specific user's ID
+        }
+      });
+      
+    toast({
+      description: `Initiating ${callType} call to General Chat`,
+    });
+  };
+
+  const handleAcceptCall = () => {
+    toast({
+      description: "Call accepted",
+    });
+    // In a real implementation, this would establish the WebRTC connection
+  };
+
+  const handleDeclineCall = () => {
+    setCallModalOpen(false);
+    setActiveCall(null);
+    toast({
+      description: "Call declined",
+    });
+  };
+
+  const handleEndCall = () => {
+    setCallModalOpen(false);
+    setActiveCall(null);
+    toast({
+      description: "Call ended",
+    });
+  };
+
   if (!user) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center h-full">
@@ -158,9 +246,31 @@ export const ChatMessages = () => {
             </div>
           </div>
         </div>
-        <button className="p-2 hover:bg-white/5 rounded-full transition-colors">
-          <Info className="w-5 h-5" />
-        </button>
+        <div className="flex gap-2">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={() => initiateCall("audio")}
+            className="rounded-full"
+          >
+            <Phone className="w-5 h-5" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={() => initiateCall("video")}
+            className="rounded-full"
+          >
+            <Video className="w-5 h-5" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon"
+            className="rounded-full"
+          >
+            <Info className="w-5 h-5" />
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
@@ -222,6 +332,19 @@ export const ChatMessages = () => {
           </button>
         </div>
       </form>
+
+      {activeCall && (
+        <CallModal
+          callType={activeCall.type}
+          callerName={activeCall.name}
+          callerAvatar={activeCall.avatar}
+          isIncoming={activeCall.isIncoming}
+          onAccept={handleAcceptCall}
+          onDecline={handleDeclineCall}
+          onEnd={handleEndCall}
+          isOpen={callModalOpen}
+        />
+      )}
     </div>
   );
 };
