@@ -1,4 +1,3 @@
-
 import { Search, Plus, LogOut, Settings } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
@@ -6,6 +5,8 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { AddContact } from "./AddContact";
+import { ContactRequests } from "./ContactRequests";
 
 interface User {
   id: string;
@@ -47,33 +48,39 @@ export const ChatSidebar = () => {
       }
     };
 
-    // Fetch other users
-    const fetchUsers = async () => {
+    // Fetch contacts instead of all users
+    const fetchContacts = async () => {
       const { data, error } = await supabase
-        .from("profiles")
-        .select("id, username, full_name, avatar_url, status")
-        .neq("id", user.id)
-        .order("username", { ascending: true });
+        .from("contacts")
+        .select(`
+          contact:contact_id(
+            id,
+            username,
+            full_name,
+            avatar_url,
+            status
+          )
+        `)
+        .eq("user_id", user.id);
 
       if (error) {
-        console.error("Error fetching users:", error);
+        console.error("Error fetching contacts:", error);
       } else if (data) {
-        const mappedUsers: User[] = data.map(profile => ({
-          id: profile.id,
-          name: profile.full_name || profile.username || "Anonymous User",
-          avatar: profile.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${profile.id}`,
-          status: profile.status || "Available"
+        const mappedUsers: User[] = data.map(({ contact }) => ({
+          id: contact.id,
+          name: contact.full_name || contact.username || "Anonymous User",
+          avatar: contact.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${contact.id}`,
+          status: contact.status || "Available"
         }));
         setOnlineUsers(mappedUsers);
       }
     };
 
     fetchProfile();
-    fetchUsers();
+    fetchContacts();
 
-    // Subscribe to presence updates
-    const channel = supabase.channel('online-users');
-    channel
+    const channel = supabase
+      .channel('contacts_presence')
       .on('presence', { event: 'sync' }, () => {
         // Future presence state handling
       })
@@ -136,11 +143,14 @@ export const ChatSidebar = () => {
         </div>
       </div>
       
+      <AddContact />
+      <ContactRequests />
+
       <div className="relative">
         <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted" />
         <input
           type="text"
-          placeholder="Search..."
+          placeholder="Search contacts..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full bg-white/5 rounded-lg pl-10 pr-4 py-2 outline-none focus:ring-1 ring-white/20 transition-all"
