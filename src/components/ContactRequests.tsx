@@ -26,7 +26,7 @@ export const ContactRequests = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user?.id) return;
 
-        const { data: requestsData, error } = await supabase
+        const { data, error } = await supabase
           .from("contact_requests")
           .select(`
             id,
@@ -44,8 +44,8 @@ export const ContactRequests = () => {
         if (error) throw error;
 
         // Transform the data to match our interface
-        const formattedRequests: ContactRequest[] = requestsData 
-          ? requestsData
+        const formattedRequests: ContactRequest[] = data 
+          ? data
               .filter(req => req.profiles) // Filter out any null sender profiles
               .map(req => ({
                 id: req.id,

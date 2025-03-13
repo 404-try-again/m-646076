@@ -21,7 +21,7 @@ export const AddContact = () => {
       // Search for users by username or email
       const { data: foundUsers, error: searchError } = await supabase
         .from("profiles")
-        .select("id, username, full_name, avatar_url")
+        .select("id, username, full_name, avatar_url, email")
         .or(`username.ilike.%${searchTerm}%,email.eq.${searchTerm}`);
 
       if (searchError) throw searchError;
