@@ -55,19 +55,20 @@ export const ChatSidebar = () => {
       }
     };
 
-    // Fetch contacts with explicit column naming for the join
+    // Fetch contacts with explicit join 
     const fetchContacts = async () => {
       setIsLoading(true);
       try {
+        // Use explicit join format with the profiles table
         const { data, error } = await supabase
           .from("contacts")
           .select(`
             contact_id,
-            profiles!contacts_contact_id_fkey(
-              id,
-              username,
-              full_name,
-              avatar_url,
+            profiles!contacts_contact_id_fkey (
+              id, 
+              username, 
+              full_name, 
+              avatar_url, 
               status
             )
           `)
