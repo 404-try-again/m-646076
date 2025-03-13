@@ -55,44 +55,52 @@ export const ChatSidebar = () => {
       }
     };
 
-    // Fetch contacts with explicit join 
+    // Fetch contacts - fixes the profile relationship
     const fetchContacts = async () => {
       setIsLoading(true);
       try {
-        // Use explicit join format with the profiles table
+        // Use a simplified query that doesn't rely on foreign key relationships
         const { data, error } = await supabase
           .from("contacts")
-          .select(`
-            contact_id,
-            profiles!contacts_contact_id_fkey (
-              id, 
-              username, 
-              full_name, 
-              avatar_url, 
-              status
-            )
-          `)
+          .select("contact_id")
           .eq("user_id", user.id);
 
         if (error) {
           console.error("Error fetching contacts:", error);
+          setIsLoading(false);
           return;
         }
 
-        if (!data) {
+        if (!data || data.length === 0) {
           setContacts([]);
+          setIsLoading(false);
           return;
         }
 
-        // Transform the data to match our interface
-        const mappedContacts: User[] = data
-          .filter(item => item.profiles) // Filter out any null profiles
-          .map(({ profiles }) => ({
-            id: profiles.id,
-            name: profiles.full_name || profiles.username || "Anonymous User",
-            avatar: profiles.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${profiles.id}`,
-            status: profiles.status || "Available"
-          }));
+        // Get the list of contact IDs
+        const contactIds = data.map(contact => contact.contact_id);
+        
+        // Fetch the profile details for each contact ID
+        const { data: profilesData, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id, username, full_name, avatar_url, status")
+          .in("id", contactIds);
+          
+        if (profilesError) {
+          console.error("Error fetching contact profiles:", profilesError);
+          setIsLoading(false);
+          return;
+        }
+
+        // Transform the profiles data to match the User interface
+        const mappedContacts: User[] = profilesData
+          ? profilesData.map(profile => ({
+              id: profile.id,
+              name: profile.full_name || profile.username || "Anonymous User",
+              avatar: profile.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${profile.id}`,
+              status: profile.status || "Available"
+            }))
+          : [];
         
         setContacts(mappedContacts);
       } catch (err) {
