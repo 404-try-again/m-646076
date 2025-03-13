@@ -17,16 +17,39 @@ export const AddContact = () => {
 
     try {
       setSearching(true);
-      const { data: foundUser, error: searchError } = await supabase
+      
+      // Search for users by username or email
+      const { data: foundUsers, error: searchError } = await supabase
         .from("profiles")
         .select("id, username, full_name, avatar_url")
-        .or(`username.ilike.${searchTerm},email.eq.${searchTerm}`)
-        .single();
+        .or(`username.ilike.%${searchTerm}%,email.eq.${searchTerm}`);
 
-      if (searchError || !foundUser) {
+      if (searchError || !foundUsers || foundUsers.length === 0) {
         toast({
           variant: "destructive",
           description: "User not found",
+        });
+        return;
+      }
+
+      // Get current user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          variant: "destructive",
+          description: "You must be logged in to add contacts",
+        });
+        return;
+      }
+
+      // We'll use the first matching user
+      const foundUser = foundUsers[0];
+      
+      // Don't allow adding yourself
+      if (foundUser.id === user.id) {
+        toast({
+          variant: "destructive",
+          description: "You cannot add yourself as a contact",
         });
         return;
       }
@@ -35,8 +58,8 @@ export const AddContact = () => {
       const { data: existingRequest } = await supabase
         .from("contact_requests")
         .select("*")
-        .match({ sender_id: (await supabase.auth.getUser()).data.user?.id, recipient_id: foundUser.id })
-        .single();
+        .match({ sender_id: user.id, recipient_id: foundUser.id })
+        .maybeSingle();
 
       if (existingRequest) {
         toast({
@@ -49,8 +72,9 @@ export const AddContact = () => {
       const { error: requestError } = await supabase
         .from("contact_requests")
         .insert({
-          sender_id: (await supabase.auth.getUser()).data.user?.id,
+          sender_id: user.id,
           recipient_id: foundUser.id,
+          status: "pending"
         });
 
       if (requestError) throw requestError;

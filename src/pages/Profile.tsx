@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
-import { Loader2, Save, ArrowLeft, Mic, Video, Phone, Menu } from "lucide-react";
+import { Loader2, Save, ArrowLeft, Mic, Video, Phone } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const Profile = () => {
@@ -22,7 +22,8 @@ const Profile = () => {
     status: "",
     avatar_url: "",
     preferred_voice_input: "microphone",
-    call_status: "offline"
+    call_status: "offline",
+    email: ""
   });
 
   useEffect(() => {
@@ -35,12 +36,18 @@ const Profile = () => {
       try {
         setLoading(true);
         
-        // First check if the profile exists
+        // Set email from auth data
+        setProfile(prev => ({
+          ...prev,
+          email: user.email || ""
+        }));
+        
+        // Check if the profile exists
         const { data, error } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", user.id)
-          .maybeSingle(); // Use maybeSingle instead of single to handle no rows case
+          .maybeSingle();
 
         if (error && error.code !== 'PGRST116') {
           console.error("Error fetching profile:", error);
@@ -49,7 +56,8 @@ const Profile = () => {
 
         if (data) {
           // Profile exists, update state
-          setProfile({
+          setProfile(prev => ({
+            ...prev,
             username: data.username || "",
             full_name: data.full_name || "",
             bio: data.bio || "",
@@ -57,14 +65,15 @@ const Profile = () => {
             avatar_url: data.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${user.id}`,
             preferred_voice_input: data.preferred_voice_input || "microphone",
             call_status: data.call_status || "offline"
-          });
+          }));
         } else {
           // Profile doesn't exist, create one
+          const defaultUsername = user.email?.split('@')[0] || '';
           const { error: insertError } = await supabase
             .from('profiles')
             .insert({
               id: user.id,
-              username: user.email?.split('@')[0] || '',
+              username: defaultUsername,
               full_name: '',
               avatar_url: `https://api.dicebear.com/7.x/micah/svg?seed=${user.id}`,
               status: 'Available',
@@ -78,15 +87,16 @@ const Profile = () => {
           }
 
           // Set default profile data
-          setProfile({
-            username: user.email?.split('@')[0] || "",
+          setProfile(prev => ({
+            ...prev,
+            username: defaultUsername,
             full_name: "",
             bio: "",
             status: "Available",
             avatar_url: `https://api.dicebear.com/7.x/micah/svg?seed=${user.id}`,
             preferred_voice_input: "microphone",
             call_status: "offline"
-          });
+          }));
         }
       } catch (error) {
         toast({
@@ -108,13 +118,23 @@ const Profile = () => {
     try {
       setUpdating(true);
       
+      // Validate username
+      if (!profile.username.trim()) {
+        toast({
+          variant: "destructive",
+          description: "Username cannot be empty",
+        });
+        return;
+      }
+      
       // Prepare the data to update
       const updates = {
+        id: user.id,
         username: profile.username,
         full_name: profile.full_name,
         bio: profile.bio,
         status: profile.status,
-        avatar_url: profile.avatar_url,
+        avatar_url: profile.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${user.id}`,
         preferred_voice_input: profile.preferred_voice_input,
         updated_at: new Date().toISOString()
       };
@@ -122,8 +142,7 @@ const Profile = () => {
       // Update the profile in Supabase
       const { error } = await supabase
         .from("profiles")
-        .update(updates)
-        .eq("id", user.id);
+        .upsert(updates);
 
       if (error) throw error;
 
@@ -185,7 +204,7 @@ const Profile = () => {
             </Avatar>
           </div>
           <h1 className="text-xl sm:text-2xl font-bold">{profile.full_name || profile.username || "Your Profile"}</h1>
-          <p className="text-sm text-muted-foreground">{user?.email}</p>
+          <p className="text-sm text-muted-foreground">{profile.email}</p>
         </div>
 
         <div className="flex justify-center space-x-3 sm:space-x-4 mb-6 sm:mb-8">
@@ -218,6 +237,7 @@ const Profile = () => {
               onChange={(e) => setProfile({ ...profile, username: e.target.value })}
               placeholder="Username"
               className="text-sm sm:text-base"
+              required
             />
           </div>
 

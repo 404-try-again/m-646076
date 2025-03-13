@@ -31,6 +31,7 @@ export const ContactRequests = () => {
           .select(`
             id,
             created_at,
+            sender_id,
             profiles!contact_requests_sender_id_fkey(
               id, 
               username, 
@@ -38,8 +39,7 @@ export const ContactRequests = () => {
             )
           `)
           .eq("recipient_id", user.user.id)
-          .eq("status", "pending")
-          .order("created_at", { ascending: false });
+          .eq("status", "pending");
 
         if (error) throw error;
 
@@ -50,7 +50,7 @@ export const ContactRequests = () => {
             id: req.id,
             created_at: req.created_at,
             sender: {
-              id: req.profiles.id,
+              id: req.sender_id,
               username: req.profiles.username || 'Unknown User',
               avatar_url: req.profiles.avatar_url || '',
             }
@@ -89,6 +89,19 @@ export const ContactRequests = () => {
 
   const handleRequest = async (requestId: string, accept: boolean) => {
     try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user?.user?.id) {
+        toast({
+          variant: "destructive",
+          description: "You must be logged in to handle requests",
+        });
+        return;
+      }
+
+      const request = requests.find(r => r.id === requestId);
+      if (!request) return;
+
+      // Update request status
       const { error: updateError } = await supabase
         .from("contact_requests")
         .update({ status: accept ? "accepted" : "rejected" })
@@ -97,17 +110,26 @@ export const ContactRequests = () => {
       if (updateError) throw updateError;
 
       if (accept) {
-        const request = requests.find(r => r.id === requestId);
-        if (request) {
-          const { error: contactError } = await supabase
-            .from("contacts")
-            .insert({
-              user_id: (await supabase.auth.getUser()).data.user?.id,
-              contact_id: request.sender.id
-            });
+        // Add to contacts (create bidirectional relationship)
+        // First, add the sender as your contact
+        const { error: contactError1 } = await supabase
+          .from("contacts")
+          .insert({
+            user_id: user.user.id,
+            contact_id: request.sender.id
+          });
 
-          if (contactError) throw contactError;
-        }
+        if (contactError1) throw contactError1;
+
+        // Then add you as the sender's contact
+        const { error: contactError2 } = await supabase
+          .from("contacts")
+          .insert({
+            user_id: request.sender.id,
+            contact_id: user.user.id
+          });
+
+        if (contactError2) throw contactError2;
       }
 
       setRequests(requests.filter(r => r.id !== requestId));

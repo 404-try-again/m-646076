@@ -29,8 +29,9 @@ export const ChatSidebar = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
-  const [onlineUsers, setOnlineUsers] = useState<User[]>([]);
+  const [contacts, setContacts] = useState<User[]>([]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
@@ -41,7 +42,7 @@ export const ChatSidebar = () => {
         .from("profiles")
         .select("id, username, full_name, avatar_url, status")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error("Error fetching profile:", error);
@@ -52,24 +53,29 @@ export const ChatSidebar = () => {
 
     // Fetch contacts with explicit column naming for the join
     const fetchContacts = async () => {
-      const { data, error } = await supabase
-        .from("contacts")
-        .select(`
-          contact_id,
-          profiles!contacts_contact_id_fkey(
-            id,
-            username,
-            full_name,
-            avatar_url,
-            status
-          )
-        `)
-        .eq("user_id", user.id);
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("contacts")
+          .select(`
+            contact_id,
+            profiles!contacts_contact_id_fkey(
+              id,
+              username,
+              full_name,
+              avatar_url,
+              status
+            )
+          `)
+          .eq("user_id", user.id);
 
-      if (error) {
-        console.error("Error fetching contacts:", error);
-      } else if (data) {
-        const mappedUsers: User[] = data
+        if (error) {
+          console.error("Error fetching contacts:", error);
+          return;
+        }
+
+        // Transform the data to match our interface
+        const mappedContacts: User[] = data
           .filter(item => item.profiles) // Filter out any null profiles
           .map(({ profiles }) => ({
             id: profiles.id,
@@ -77,18 +83,32 @@ export const ChatSidebar = () => {
             avatar: profiles.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${profiles.id}`,
             status: profiles.status || "Available"
           }));
-        setOnlineUsers(mappedUsers);
+        
+        setContacts(mappedContacts);
+      } catch (err) {
+        console.error("Error in fetchContacts:", err);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     fetchProfile();
     fetchContacts();
 
+    // Set up realtime subscription for contacts changes
     const channel = supabase
       .channel('contacts_presence')
-      .on('presence', { event: 'sync' }, () => {
-        // Future presence state handling
-      })
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'contacts'
+        },
+        () => {
+          fetchContacts();
+        }
+      )
       .subscribe();
 
     return () => {
@@ -110,8 +130,8 @@ export const ChatSidebar = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
-  const filteredUsers = onlineUsers.filter(user => 
-    user.name.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredContacts = contacts.filter(contact => 
+    contact.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Mobile sidebar classes
@@ -186,26 +206,28 @@ export const ChatSidebar = () => {
         </div>
 
         <div className="flex-1 space-y-2 overflow-y-auto scrollbar-hide">
-          {filteredUsers.length > 0 ? (
-            filteredUsers.map((user) => (
+          {isLoading ? (
+            <div className="text-center py-4 text-muted-foreground">Loading contacts...</div>
+          ) : filteredContacts.length > 0 ? (
+            filteredContacts.map((contact) => (
               <div
-                key={user.id}
+                key={contact.id}
                 className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer transition-colors"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 <Avatar className="w-10 h-10">
-                  <img src={user.avatar} alt={user.name} className="object-cover" />
+                  <img src={contact.avatar} alt={contact.name} className="object-cover" />
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium">{user.name}</div>
-                  <div className="text-sm text-muted truncate">{user.status}</div>
+                  <div className="font-medium">{contact.name}</div>
+                  <div className="text-sm text-muted truncate">{contact.status}</div>
                 </div>
               </div>
             ))
           ) : searchTerm ? (
-            <div className="text-center py-4 text-muted-foreground">No users found</div>
+            <div className="text-center py-4 text-muted-foreground">No contacts found</div>
           ) : (
-            <div className="text-center py-4 text-muted-foreground">Loading users...</div>
+            <div className="text-center py-4 text-muted-foreground">No contacts yet. Add some!</div>
           )}
         </div>
       </div>

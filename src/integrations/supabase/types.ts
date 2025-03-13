@@ -9,126 +9,226 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      contact_requests: {
+      chat_room_users: {
         Row: {
-          created_at: string | null
-          id: string
-          recipient_id: string
-          sender_id: string
-          status: string
-          updated_at: string | null
+          chat_room_id: number
+          user_id: number
         }
         Insert: {
-          created_at?: string | null
-          id?: string
-          recipient_id: string
-          sender_id: string
-          status?: string
-          updated_at?: string | null
+          chat_room_id: number
+          user_id: number
         }
         Update: {
-          created_at?: string | null
-          id?: string
-          recipient_id?: string
-          sender_id?: string
-          status?: string
-          updated_at?: string | null
+          chat_room_id?: number
+          user_id?: number
         }
         Relationships: [
           {
-            foreignKeyName: "contact_requests_recipient_id_fkey"
-            columns: ["recipient_id"]
+            foreignKeyName: "chat_room_users_chat_room_id_fkey"
+            columns: ["chat_room_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "chat_rooms"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "contact_requests_sender_id_fkey"
-            columns: ["sender_id"]
+            foreignKeyName: "chat_room_users_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
       }
-      contacts: {
+      chat_rooms: {
         Row: {
-          contact_id: string
           created_at: string | null
-          id: string
-          user_id: string
+          id: number
+          is_group: boolean | null
+          name: string | null
         }
         Insert: {
-          contact_id: string
           created_at?: string | null
-          id?: string
-          user_id: string
+          id?: number
+          is_group?: boolean | null
+          name?: string | null
         }
         Update: {
-          contact_id?: string
           created_at?: string | null
-          id?: string
-          user_id?: string
+          id?: number
+          is_group?: boolean | null
+          name?: string | null
+        }
+        Relationships: []
+      }
+      files: {
+        Row: {
+          chat_room_id: number | null
+          file_path: string
+          id: number
+          uploaded_at: string | null
+          user_id: number | null
+        }
+        Insert: {
+          chat_room_id?: number | null
+          file_path: string
+          id?: number
+          uploaded_at?: string | null
+          user_id?: number | null
+        }
+        Update: {
+          chat_room_id?: number | null
+          file_path?: string
+          id?: number
+          uploaded_at?: string | null
+          user_id?: number | null
         }
         Relationships: [
           {
-            foreignKeyName: "contacts_contact_id_fkey"
-            columns: ["contact_id"]
+            foreignKeyName: "files_chat_room_id_fkey"
+            columns: ["chat_room_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "chat_rooms"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "contacts_user_id_fkey"
+            foreignKeyName: "files_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          chat_room_id: number | null
+          expiry_time: string | null
+          id: number
+          message_text: string | null
+          message_type: string | null
+          read: boolean | null
+          sender_id: number | null
+          sent_at: string | null
+        }
+        Insert: {
+          chat_room_id?: number | null
+          expiry_time?: string | null
+          id?: number
+          message_text?: string | null
+          message_type?: string | null
+          read?: boolean | null
+          sender_id?: number | null
+          sent_at?: string | null
+        }
+        Update: {
+          chat_room_id?: number | null
+          expiry_time?: string | null
+          id?: number
+          message_text?: string | null
+          message_type?: string | null
+          read?: boolean | null
+          sender_id?: number | null
+          sent_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_chat_room_id_fkey"
+            columns: ["chat_room_id"]
+            isOneToOne: false
+            referencedRelation: "chat_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
       }
       profiles: {
         Row: {
-          avatar_url: string | null
           bio: string | null
-          call_status: string | null
-          created_at: string | null
-          full_name: string | null
-          id: string
-          in_call: boolean | null
-          is_online: boolean | null
-          preferred_voice_input: string | null
+          profile_picture: string | null
           status: string | null
-          updated_at: string | null
-          username: string | null
+          two_factor_auth_method: string | null
+          user_id: number
+          username: string
         }
         Insert: {
-          avatar_url?: string | null
           bio?: string | null
-          call_status?: string | null
-          created_at?: string | null
-          full_name?: string | null
-          id: string
-          in_call?: boolean | null
-          is_online?: boolean | null
-          preferred_voice_input?: string | null
+          profile_picture?: string | null
           status?: string | null
-          updated_at?: string | null
-          username?: string | null
+          two_factor_auth_method?: string | null
+          user_id: number
+          username: string
         }
         Update: {
-          avatar_url?: string | null
           bio?: string | null
-          call_status?: string | null
-          created_at?: string | null
-          full_name?: string | null
-          id?: string
-          in_call?: boolean | null
-          is_online?: boolean | null
-          preferred_voice_input?: string | null
+          profile_picture?: string | null
           status?: string | null
-          updated_at?: string | null
-          username?: string | null
+          two_factor_auth_method?: string | null
+          user_id?: number
+          username?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_activity: {
+        Row: {
+          action: string
+          activity_timestamp: string | null
+          id: number
+          user_id: number | null
+        }
+        Insert: {
+          action: string
+          activity_timestamp?: string | null
+          id?: number
+          user_id?: number | null
+        }
+        Update: {
+          action?: string
+          activity_timestamp?: string | null
+          id?: number
+          user_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_activity_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: number
+          password_hash: string
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: number
+          password_hash: string
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: number
+          password_hash?: string
         }
         Relationships: []
       }
@@ -137,7 +237,72 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      delete_file: {
+        Args: {
+          file_id: number
+          p_user_id: number
+        }
+        Returns: undefined
+      }
+      enable_two_factor_auth: {
+        Args: {
+          p_user_id: number
+          method: string
+        }
+        Returns: undefined
+      }
+      mark_message_as_read: {
+        Args: {
+          message_id: number
+        }
+        Returns: undefined
+      }
+      remove_user_from_group: {
+        Args: {
+          group_id: number
+          p_user_id: number
+          removed_by: number
+        }
+        Returns: undefined
+      }
+      send_message: {
+        Args: {
+          sender_id: number
+          chat_room_id: number
+          message: string
+          message_type: string
+        }
+        Returns: undefined
+      }
+      set_message_expiry: {
+        Args: {
+          message_id: number
+          expiry: string
+        }
+        Returns: undefined
+      }
+      set_user_status: {
+        Args: {
+          p_user_id: number
+          p_status: string
+        }
+        Returns: undefined
+      }
+      track_user_activity: {
+        Args: {
+          user_id: number
+          action: string
+          activity_timestamp: string
+        }
+        Returns: undefined
+      }
+      update_user_profile: {
+        Args: {
+          p_user_id: number
+          new_data: Json
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
