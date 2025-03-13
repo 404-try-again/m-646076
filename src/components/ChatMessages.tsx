@@ -84,16 +84,78 @@ export const ChatMessages = () => {
 
   const fetchUserInfo = async (userId: string) => {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('username, avatar_url')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
+      
+      if (error) {
+        console.error("Error fetching user info:", error);
+        return null;
+      }
       
       return data;
     } catch (error) {
       console.error("Error fetching user info:", error);
       return null;
+    }
+  };
+
+  const initiateCall = async (callType: "audio" | "video") => {
+    if (!user) return;
+    
+    try {
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select('username, full_name, avatar_url')
+        .eq('id', user.id)
+        .maybeSingle();
+    
+      if (error) {
+        console.error("Error fetching profile:", error);
+        toast({
+          variant: "destructive",
+          description: "Could not initiate call. Please try again.",
+        });
+        return;
+      }
+    
+      const callerName = profileData?.full_name || profileData?.username || 'User';
+      const callerAvatar = profileData?.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${user.id}`;
+      
+      setActiveCall({
+        type: callType,
+        name: "General Chat",
+        avatar: "https://api.dicebear.com/7.x/micah/svg?seed=general",
+        isIncoming: false
+      });
+      
+      setCallModalOpen(true);
+      
+      await supabase
+        .channel('chat-updates')
+        .send({
+          type: 'broadcast',
+          event: 'call',
+          payload: {
+            callType,
+            callerName,
+            callerAvatar,
+            caller_id: user.id,
+            recipient_id: 'general'
+          }
+        });
+        
+      toast({
+        description: `Initiating ${callType} call to General Chat`,
+      });
+    } catch (error) {
+      console.error("Error initiating call:", error);
+      toast({
+        variant: "destructive",
+        description: "Could not initiate call. Please try again.",
+      });
     }
   };
 
@@ -136,46 +198,6 @@ export const ChatMessages = () => {
         description: "Message may not be visible to others. Network issue detected.",
       });
     }
-  };
-
-  const initiateCall = async (callType: "audio" | "video") => {
-    if (!user) return;
-    
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('username, full_name, avatar_url')
-      .eq('id', user.id)
-      .single();
-    
-    const callerName = profileData?.full_name || profileData?.username || 'User';
-    const callerAvatar = profileData?.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${user.id}`;
-    
-    setActiveCall({
-      type: callType,
-      name: "General Chat",
-      avatar: "https://api.dicebear.com/7.x/micah/svg?seed=general",
-      isIncoming: false
-    });
-    
-    setCallModalOpen(true);
-    
-    await supabase
-      .channel('chat-updates')
-      .send({
-        type: 'broadcast',
-        event: 'call',
-        payload: {
-          callType,
-          callerName,
-          callerAvatar,
-          caller_id: user.id,
-          recipient_id: 'general'
-        }
-      });
-      
-    toast({
-      description: `Initiating ${callType} call to General Chat`,
-    });
   };
 
   const handleAcceptCall = () => {

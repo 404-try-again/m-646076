@@ -24,7 +24,9 @@ export const AddContact = () => {
         .select("id, username, full_name, avatar_url")
         .or(`username.ilike.%${searchTerm}%,email.eq.${searchTerm}`);
 
-      if (searchError || !foundUsers || foundUsers.length === 0) {
+      if (searchError) throw searchError;
+      
+      if (!foundUsers || foundUsers.length === 0) {
         toast({
           variant: "destructive",
           description: "User not found",
@@ -55,12 +57,15 @@ export const AddContact = () => {
       }
 
       // Check if request already exists
-      const { data: existingRequest } = await supabase
+      const { data: existingRequest, error: checkError } = await supabase
         .from("contact_requests")
         .select("*")
-        .match({ sender_id: user.id, recipient_id: foundUser.id })
+        .eq("sender_id", user.id)
+        .eq("recipient_id", foundUser.id)
         .maybeSingle();
 
+      if (checkError) throw checkError;
+      
       if (existingRequest) {
         toast({
           description: "Contact request already sent",
@@ -85,6 +90,7 @@ export const AddContact = () => {
       setSearchTerm("");
       setShowSearch(false);
     } catch (error: any) {
+      console.error("Error sending request:", error);
       toast({
         variant: "destructive",
         description: error.message || "Failed to send request",

@@ -38,16 +38,20 @@ export const ChatSidebar = () => {
 
     // Fetch the user's profile
     const fetchProfile = async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, username, full_name, avatar_url, status")
-        .eq("id", user.id)
-        .maybeSingle();
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id, username, full_name, avatar_url, status")
+          .eq("id", user.id)
+          .maybeSingle();
 
-      if (error) {
-        console.error("Error fetching profile:", error);
-      } else if (data) {
-        setUserProfile(data);
+        if (error) {
+          console.error("Error fetching profile:", error);
+        } else if (data) {
+          setUserProfile(data);
+        }
+      } catch (err) {
+        console.error("Unexpected error fetching profile:", err);
       }
     };
 
@@ -71,6 +75,11 @@ export const ChatSidebar = () => {
 
         if (error) {
           console.error("Error fetching contacts:", error);
+          return;
+        }
+
+        if (!data) {
+          setContacts([]);
           return;
         }
 

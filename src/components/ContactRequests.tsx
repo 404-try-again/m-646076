@@ -23,8 +23,8 @@ export const ContactRequests = () => {
   useEffect(() => {
     const fetchRequests = async () => {
       try {
-        const { data: user } = await supabase.auth.getUser();
-        if (!user?.user?.id) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.id) return;
 
         const { data: requestsData, error } = await supabase
           .from("contact_requests")
@@ -38,23 +38,25 @@ export const ContactRequests = () => {
               avatar_url
             )
           `)
-          .eq("recipient_id", user.user.id)
+          .eq("recipient_id", user.id)
           .eq("status", "pending");
 
         if (error) throw error;
 
         // Transform the data to match our interface
-        const formattedRequests: ContactRequest[] = (requestsData || [])
-          .filter(req => req.profiles) // Filter out any null sender profiles
-          .map(req => ({
-            id: req.id,
-            created_at: req.created_at,
-            sender: {
-              id: req.sender_id,
-              username: req.profiles.username || 'Unknown User',
-              avatar_url: req.profiles.avatar_url || '',
-            }
-          }));
+        const formattedRequests: ContactRequest[] = requestsData 
+          ? requestsData
+              .filter(req => req.profiles) // Filter out any null sender profiles
+              .map(req => ({
+                id: req.id,
+                created_at: req.created_at,
+                sender: {
+                  id: req.sender_id,
+                  username: req.profiles.username || 'Unknown User',
+                  avatar_url: req.profiles.avatar_url || '',
+                }
+              }))
+          : [];
 
         setRequests(formattedRequests);
       } catch (error) {
@@ -89,8 +91,8 @@ export const ContactRequests = () => {
 
   const handleRequest = async (requestId: string, accept: boolean) => {
     try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user?.user?.id) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) {
         toast({
           variant: "destructive",
           description: "You must be logged in to handle requests",
@@ -115,7 +117,7 @@ export const ContactRequests = () => {
         const { error: contactError1 } = await supabase
           .from("contacts")
           .insert({
-            user_id: user.user.id,
+            user_id: user.id,
             contact_id: request.sender.id
           });
 
@@ -126,7 +128,7 @@ export const ContactRequests = () => {
           .from("contacts")
           .insert({
             user_id: request.sender.id,
-            contact_id: user.user.id
+            contact_id: user.id
           });
 
         if (contactError2) throw contactError2;
@@ -137,6 +139,7 @@ export const ContactRequests = () => {
         description: `Contact request ${accept ? "accepted" : "declined"}`,
       });
     } catch (error: any) {
+      console.error("Error handling request:", error);
       toast({
         variant: "destructive",
         description: error.message || "Failed to process request",

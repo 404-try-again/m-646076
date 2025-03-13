@@ -75,6 +75,7 @@ const Profile = () => {
               id: user.id,
               username: defaultUsername,
               full_name: '',
+              bio: '',
               avatar_url: `https://api.dicebear.com/7.x/micah/svg?seed=${user.id}`,
               status: 'Available',
               preferred_voice_input: 'microphone',
@@ -136,13 +137,14 @@ const Profile = () => {
         status: profile.status,
         avatar_url: profile.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${user.id}`,
         preferred_voice_input: profile.preferred_voice_input,
+        call_status: profile.call_status,
         updated_at: new Date().toISOString()
       };
 
       // Update the profile in Supabase
       const { error } = await supabase
         .from("profiles")
-        .upsert(updates);
+        .upsert(updates, { onConflict: 'id' });
 
       if (error) throw error;
 
