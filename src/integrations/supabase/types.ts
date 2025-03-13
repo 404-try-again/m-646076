@@ -60,6 +60,51 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_requests: {
+        Row: {
+          created_at: string | null
+          id: string
+          recipient_id: string
+          sender_id: string
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          recipient_id: string
+          sender_id: string
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          recipient_id?: string
+          sender_id?: string
+          status?: string | null
+        }
+        Relationships: []
+      }
+      contacts: {
+        Row: {
+          contact_id: string
+          created_at: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          contact_id: string
+          created_at?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          contact_id?: string
+          created_at?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       files: {
         Row: {
           chat_room_id: number | null
@@ -149,38 +194,42 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_url: string | null
           bio: string | null
-          profile_picture: string | null
+          call_status: string | null
+          email: string | null
+          full_name: string | null
+          id: string
+          preferred_voice_input: string | null
           status: string | null
-          two_factor_auth_method: string | null
-          user_id: number
-          username: string
+          updated_at: string | null
+          username: string | null
         }
         Insert: {
+          avatar_url?: string | null
           bio?: string | null
-          profile_picture?: string | null
+          call_status?: string | null
+          email?: string | null
+          full_name?: string | null
+          id: string
+          preferred_voice_input?: string | null
           status?: string | null
-          two_factor_auth_method?: string | null
-          user_id: number
-          username: string
+          updated_at?: string | null
+          username?: string | null
         }
         Update: {
+          avatar_url?: string | null
           bio?: string | null
-          profile_picture?: string | null
+          call_status?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          preferred_voice_input?: string | null
           status?: string | null
-          two_factor_auth_method?: string | null
-          user_id?: number
-          username?: string
+          updated_at?: string | null
+          username?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "profiles_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       user_activity: {
         Row: {
