@@ -26,7 +26,7 @@ export const GeminiChat = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Welcome message
+  // Welcome message - only run once when component mounts
   useEffect(() => {
     if (messages.length === 0) {
       setMessages([
@@ -37,7 +37,7 @@ export const GeminiChat = () => {
         },
       ]);
     }
-  }, []);
+  }, []); // Empty dependency array ensures it only runs once
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,6 +50,7 @@ export const GeminiChat = () => {
         timestamp: new Date(),
       };
 
+      // Use functional update to avoid dependencies on messages state
       setMessages((prev) => [...prev, userMessage]);
       setNewMessage("");
       setIsLoading(true);
@@ -68,21 +69,36 @@ export const GeminiChat = () => {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase function error:", error);
+        throw new Error(error.message || "Failed to connect to AI service");
+      }
 
+      // Handle potential missing response
       const assistantMessage = {
         role: "assistant" as const,
-        content: data.response || "I'm sorry, I couldn't process that request.",
+        content: data?.response || "I'm sorry, I couldn't process that request.",
         timestamp: new Date(),
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error sending message:", error);
+      // Show a toast with the specific error if available
       toast({
         variant: "destructive",
-        description: "Failed to get a response from Gemini",
+        description: `Error: ${error.message || "Failed to get a response from Gemini"}`,
       });
+      
+      // Add an error message to the chat if needed
+      setMessages((prev) => [
+        ...prev, 
+        {
+          role: "assistant",
+          content: "I encountered an error processing your request. Please try again later.",
+          timestamp: new Date(),
+        }
+      ]);
     } finally {
       setIsLoading(false);
     }
@@ -113,7 +129,7 @@ export const GeminiChat = () => {
         <div>
           <div className="font-medium text-sm sm:text-base">Gemini AI Assistant</div>
           <div className="text-xs sm:text-sm text-muted">
-            Powered by Google's Gemini 1.5 Pro
+            Powered by Google's Gemini 1.0 Pro
           </div>
         </div>
       </div>

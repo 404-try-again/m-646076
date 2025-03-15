@@ -17,7 +17,28 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, history = [] } = await req.json();
+    // Check if API key is set
+    if (!GEMINI_API_KEY) {
+      throw new Error("GEMINI_API_KEY is not set");
+    }
+
+    // Safely parse request JSON
+    let requestData;
+    try {
+      requestData = await req.json();
+    } catch (err) {
+      return new Response(JSON.stringify({ 
+        error: "Invalid JSON format" 
+      }), {
+        status: 400,
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json' 
+        }
+      });
+    }
+    
+    const { prompt, history = [] } = requestData;
     
     console.log("Received request with prompt:", prompt);
     console.log("Chat history length:", history.length);
@@ -75,11 +96,10 @@ serve(async (req) => {
     const data = await response.json();
     console.log("Received response from Gemini API");
 
-    // Extract response text
-    let responseText = '';
-    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-      responseText = data.candidates[0].content.parts[0].text;
-    } else if (data.error) {
+    // Extract response text with safe checks
+    let responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "No response from the AI.";
+    
+    if (data.error) {
       console.error("Gemini API error:", data.error);
       throw new Error(data.error.message || "Error from Gemini API");
     }
@@ -95,7 +115,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error in gemini-chat function:", error);
     return new Response(JSON.stringify({ 
-      error: error.message 
+      error: error.message || "An unknown error occurred" 
     }), {
       status: 500,
       headers: { 
