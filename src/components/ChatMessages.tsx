@@ -1,3 +1,4 @@
+
 import { Avatar } from "@/components/ui/avatar";
 import { Check, Info, Send, Phone, Video, Menu } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
@@ -6,20 +7,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { CallModal } from "@/components/CallModal";
 import { Button } from "@/components/ui/button";
-
-interface Message {
-  id: string;
-  content: string;
-  sender_id: string;
-  sender_name?: string;
-  sender_avatar?: string;
-  timestamp: string;
-  read: boolean;
-}
+import { ChatMessage } from "@/types/user";
 
 export const ChatMessages = () => {
   const { user } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [callModalOpen, setCallModalOpen] = useState(false);
@@ -35,34 +27,100 @@ export const ChatMessages = () => {
   useEffect(() => {
     if (!user) return;
 
-    const loadMessages = () => {
+    // Scroll to bottom when messages change
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchMessages = async () => {
       try {
-        const savedMessages = localStorage.getItem('chat_messages');
-        if (savedMessages) {
-          setMessages(JSON.parse(savedMessages));
+        setLoading(true);
+
+        // Fetch messages from Supabase
+        const { data, error } = await supabase
+          .from('chat_messages')
+          .select(`
+            id, 
+            content, 
+            sender_id, 
+            recipient_id,
+            chat_room_id, 
+            is_read,
+            created_at,
+            profiles:sender_id (username, full_name, avatar_url)
+          `)
+          .eq('chat_room_id', 'general')
+          .order('created_at', { ascending: true });
+
+        if (error) {
+          throw error;
+        }
+
+        if (data) {
+          const formattedMessages: ChatMessage[] = data.map(msg => ({
+            id: msg.id,
+            content: msg.content,
+            sender_id: msg.sender_id,
+            recipient_id: msg.recipient_id,
+            chat_room_id: msg.chat_room_id,
+            is_read: msg.is_read,
+            created_at: msg.created_at,
+            sender_name: msg.profiles?.full_name || msg.profiles?.username || 'Unknown User',
+            sender_avatar: msg.profiles?.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${msg.sender_id}`
+          }));
+
+          setMessages(formattedMessages);
         }
       } catch (error) {
-        console.error("Error loading messages:", error);
+        console.error("Error fetching messages:", error);
+        toast({
+          variant: "destructive",
+          description: "Failed to load messages",
+        });
       } finally {
         setLoading(false);
       }
     };
 
-    loadMessages();
+    fetchMessages();
 
-    const channel = supabase
-      .channel('chat-updates')
-      .on('broadcast', { event: 'message' }, (payload) => {
-        const newMessage = payload.payload as Message;
+    // Subscribe to real-time updates for new messages
+    const messagesChannel = supabase
+      .channel('public:chat_messages')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'chat_messages',
+        filter: `chat_room_id=eq.general`
+      }, async (payload) => {
+        // Get sender info
+        const { data: senderProfile } = await supabase
+          .from('profiles')
+          .select('username, full_name, avatar_url')
+          .eq('id', payload.new.sender_id)
+          .maybeSingle();
+
+        const newMessage: ChatMessage = {
+          id: payload.new.id,
+          content: payload.new.content,
+          sender_id: payload.new.sender_id,
+          recipient_id: payload.new.recipient_id,
+          chat_room_id: payload.new.chat_room_id,
+          is_read: payload.new.is_read,
+          created_at: payload.new.created_at,
+          sender_name: senderProfile?.full_name || senderProfile?.username || 'Unknown User',
+          sender_avatar: senderProfile?.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${payload.new.sender_id}`
+        };
         
-        if (newMessage.sender_id !== user.id) {
-          setMessages(prevMessages => {
-            const updatedMessages = [...prevMessages, newMessage];
-            localStorage.setItem('chat_messages', JSON.stringify(updatedMessages));
-            return updatedMessages;
-          });
-        }
+        setMessages(prevMessages => [...prevMessages, newMessage]);
       })
+      .subscribe();
+
+    // Subscribe to call events
+    const callChannel = supabase
+      .channel('calls')
       .on('broadcast', { event: 'call' }, (payload) => {
         const { callType, callerName, callerAvatar } = payload.payload as any;
         if (payload.payload.recipient_id === user.id) {
@@ -78,27 +136,35 @@ export const ChatMessages = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(messagesChannel);
+      supabase.removeChannel(callChannel);
     };
   }, [user]);
 
-  const fetchUserInfo = async (userId: string) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !user) return;
+
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('username, avatar_url')
-        .eq('id', userId)
-        .maybeSingle();
+      // Insert message to Supabase
+      const { error } = await supabase
+        .from('chat_messages')
+        .insert({
+          sender_id: user.id,
+          chat_room_id: 'general',
+          content: newMessage,
+          is_read: false
+        });
+
+      if (error) throw error;
       
-      if (error) {
-        console.error("Error fetching user info:", error);
-        return null;
-      }
-      
-      return data;
+      setNewMessage("");
     } catch (error) {
-      console.error("Error fetching user info:", error);
-      return null;
+      console.error("Error sending message:", error);
+      toast({
+        variant: "destructive",
+        description: "Failed to send message",
+      });
     }
   };
 
@@ -112,14 +178,7 @@ export const ChatMessages = () => {
         .eq('id', user.id)
         .maybeSingle();
     
-      if (error) {
-        console.error("Error fetching profile:", error);
-        toast({
-          variant: "destructive",
-          description: "Could not initiate call. Please try again.",
-        });
-        return;
-      }
+      if (error) throw error;
     
       const callerName = profileData?.full_name || profileData?.username || 'User';
       const callerAvatar = profileData?.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${user.id}`;
@@ -134,7 +193,7 @@ export const ChatMessages = () => {
       setCallModalOpen(true);
       
       await supabase
-        .channel('chat-updates')
+        .channel('calls')
         .send({
           type: 'broadcast',
           event: 'call',
@@ -155,47 +214,6 @@ export const ChatMessages = () => {
       toast({
         variant: "destructive",
         description: "Could not initiate call. Please try again.",
-      });
-    }
-  };
-
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !user) return;
-
-    const messageId = Date.now().toString();
-    
-    const newMsg: Message = {
-      id: messageId,
-      content: newMessage,
-      sender_id: user.id,
-      sender_name: user.user_metadata?.username || 'Me',
-      sender_avatar: user.user_metadata?.avatar_url,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      read: false
-    };
-
-    setMessages(prev => {
-      const updatedMessages = [...prev, newMsg];
-      localStorage.setItem('chat_messages', JSON.stringify(updatedMessages));
-      return updatedMessages;
-    });
-    
-    setNewMessage("");
-
-    try {
-      await supabase
-        .channel('chat-updates')
-        .send({
-          type: 'broadcast',
-          event: 'message',
-          payload: newMsg
-        });
-    } catch (error) {
-      console.error("Error sending message:", error);
-      toast({
-        variant: "destructive",
-        description: "Message may not be visible to others. Network issue detected.",
       });
     }
   };
@@ -238,6 +256,10 @@ export const ChatMessages = () => {
       </div>
     );
   }
+
+  const formatMessageTime = (timestamp: string) => {
+    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
     <div className="flex-1 flex flex-col h-screen">
@@ -320,8 +342,8 @@ export const ChatMessages = () => {
                   {message.sender_id !== user.id && (
                     <span className="text-xs">{message.sender_name}</span>
                   )}
-                  <span>{message.timestamp}</span>
-                  {message.sender_id === user.id && message.read && <Check className="w-3 h-3" />}
+                  <span>{formatMessageTime(message.created_at)}</span>
+                  {message.sender_id === user.id && message.is_read && <Check className="w-3 h-3" />}
                 </div>
               </div>
             </div>

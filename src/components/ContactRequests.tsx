@@ -26,55 +26,33 @@ export const ContactRequests = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user?.id) return;
 
-        // Use a simplified query approach that doesn't rely on foreign key relationship
         const { data, error } = await supabase
           .from("contact_requests")
-          .select("id, created_at, sender_id")
+          .select(`
+            id, 
+            created_at,
+            sender_id, 
+            profiles:sender_id (id, username, avatar_url)
+          `)
           .eq("recipient_id", user.id)
           .eq("status", "pending");
 
         if (error) throw error;
         
-        if (!data || data.length === 0) {
-          setRequests([]);
-          setLoading(false);
-          return;
-        }
-        
-        // Get the list of sender IDs
-        const senderIds = data.map(req => req.sender_id);
-        
-        // Fetch the profile details for each sender
-        const { data: profilesData, error: profilesError } = await supabase
-          .from("profiles")
-          .select("id, username, avatar_url")
-          .in("id", senderIds);
-          
-        if (profilesError) throw profilesError;
-
-        // Create a map of profiles by ID for easy lookup
-        const profilesMap = new Map();
-        if (profilesData) {
-          profilesData.forEach(profile => {
-            profilesMap.set(profile.id, profile);
-          });
-        }
-        
-        // Transform the data to match our interface
-        const formattedRequests: ContactRequest[] = data.map(req => {
-          const profile = profilesMap.get(req.sender_id);
-          return {
+        if (data) {
+          // Transform the data to match our interface
+          const formattedRequests: ContactRequest[] = data.map(req => ({
             id: req.id,
             created_at: req.created_at,
             sender: {
               id: req.sender_id,
-              username: profile?.username || 'Unknown User',
-              avatar_url: profile?.avatar_url || '',
+              username: req.profiles?.username || 'Unknown User',
+              avatar_url: req.profiles?.avatar_url || '',
             }
-          };
-        });
+          }));
 
-        setRequests(formattedRequests);
+          setRequests(formattedRequests);
+        }
       } catch (error) {
         console.error("Error fetching requests:", error);
       } finally {
@@ -84,7 +62,7 @@ export const ContactRequests = () => {
 
     fetchRequests();
 
-    // Subscribe to real-time updates
+    // Subscribe to real-time updates using the new postgres_changes functionality
     const channel = supabase
       .channel('contact_requests_changes')
       .on(
@@ -150,7 +128,9 @@ export const ContactRequests = () => {
         if (contactError2) throw contactError2;
       }
 
+      // Filter out the handled request (will be automatically updated via realtime subscription)
       setRequests(requests.filter(r => r.id !== requestId));
+      
       toast({
         description: `Contact request ${accept ? "accepted" : "declined"}`,
       });

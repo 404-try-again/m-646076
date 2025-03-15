@@ -3,8 +3,8 @@ import { LogOut, Settings } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { useNavigate } from "react-router-dom";
 import { Profile } from "@/types/profile";
+import { OnlineIndicator } from "@/components/OnlineIndicator";
 
 interface UserProfileHeaderProps {
   userProfile: Profile | null;
@@ -21,13 +21,16 @@ export const UserProfileHeader = ({ userProfile, handleLogout, navigateToProfile
         className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
         onClick={navigateToProfile}
       >
-        <Avatar className="w-8 h-8">
-          <img 
-            src={userProfile?.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${user?.id}`} 
-            alt={userProfile?.username || "Me"} 
-            className="object-cover"
-          />
-        </Avatar>
+        <div className="relative">
+          <Avatar className="w-8 h-8">
+            <img 
+              src={userProfile?.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${user?.id}`} 
+              alt={userProfile?.username || "Me"} 
+              className="object-cover"
+            />
+          </Avatar>
+          <OnlineIndicator isOnline={true} />
+        </div>
         <div className="flex flex-col">
           <span className="font-medium">{userProfile?.full_name || userProfile?.username || "Me"}</span>
           <span className="text-xs text-muted-foreground">{userProfile?.status || "Available"}</span>
