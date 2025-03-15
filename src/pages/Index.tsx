@@ -1,15 +1,17 @@
 
 import { ChatSidebar } from "@/components/ChatSidebar";
 import { ChatMessages } from "@/components/ChatMessages";
+import { GeminiChat } from "@/components/GeminiChat";
 import { Auth } from "@/components/Auth";
 import { useAuth } from "@/hooks/useAuth";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 const Index = () => {
   const { user, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [activeChat, setActiveChat] = useState<"general" | "gemini">("general");
 
   useEffect(() => {
     // If we're redirected back to the index page with a specific action
@@ -18,6 +20,11 @@ const Index = () => {
     
     if (action === 'profile' && user) {
       navigate('/profile');
+    }
+    
+    // Check if we should show Gemini chat
+    if (params.get('chat') === 'gemini') {
+      setActiveChat("gemini");
     }
   }, [user, location, navigate]);
 
@@ -39,8 +46,12 @@ const Index = () => {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <ChatSidebar />
-      <ChatMessages />
+      <ChatSidebar onSelectChat={(chatType) => setActiveChat(chatType)} activeChat={activeChat} />
+      {activeChat === "general" ? (
+        <ChatMessages />
+      ) : (
+        <GeminiChat />
+      )}
     </div>
   );
 };

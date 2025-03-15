@@ -18,3 +18,5 @@ export interface ChatMessage {
   sender_name?: string;
   sender_avatar?: string;
 }
+
+export type ChatType = "general" | "gemini";

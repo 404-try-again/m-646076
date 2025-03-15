@@ -11,8 +11,14 @@ import { ContactList } from "./sidebar/ContactList";
 import { MobileMenuButton } from "./sidebar/MobileMenuButton";
 import { User } from "@/types/user";
 import { Profile } from "@/types/profile";
+import { Bot, MessageCircle } from "lucide-react";
 
-export const ChatSidebar = () => {
+interface ChatSidebarProps {
+  onSelectChat?: (chatType: "general" | "gemini") => void;
+  activeChat?: "general" | "gemini";
+}
+
+export const ChatSidebar = ({ onSelectChat, activeChat = "general" }: ChatSidebarProps) => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
@@ -159,6 +165,41 @@ export const ChatSidebar = () => {
           handleLogout={handleLogout}
           navigateToProfile={navigateToProfile}
         />
+        
+        {/* Chat Selection */}
+        <div className="glass p-2 rounded-md">
+          <div className="text-xs text-muted mb-2 px-1">CHATS</div>
+          <div className="flex gap-2">
+            <button 
+              className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors w-full text-left ${
+                activeChat === "general" 
+                  ? "bg-white/10" 
+                  : "hover:bg-white/5"
+              }`}
+              onClick={() => {
+                onSelectChat && onSelectChat("general");
+                setIsMobileMenuOpen(false);
+              }}
+            >
+              <MessageCircle size={18} />
+              <span>General Chat</span>
+            </button>
+            <button 
+              className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors w-full text-left ${
+                activeChat === "gemini" 
+                  ? "bg-white/10" 
+                  : "hover:bg-white/5"
+              }`}
+              onClick={() => {
+                onSelectChat && onSelectChat("gemini");
+                setIsMobileMenuOpen(false);
+              }}
+            >
+              <Bot size={18} />
+              <span>Gemini AI</span>
+            </button>
+          </div>
+        </div>
         
         <AddContact />
         <ContactRequests />
