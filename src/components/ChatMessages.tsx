@@ -1,6 +1,6 @@
 
 import { Avatar } from "@/components/ui/avatar";
-import { Check, Info, Phone, Video, Menu } from "lucide-react";
+import { Check, Info, Phone, Video, Menu, Send } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
