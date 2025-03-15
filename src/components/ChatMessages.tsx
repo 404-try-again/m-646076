@@ -1,6 +1,6 @@
 
 import { Avatar } from "@/components/ui/avatar";
-import { Check, Info, Send, Phone, Video, Menu } from "lucide-react";
+import { Check, Info, Phone, Video, Menu } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -38,7 +38,7 @@ export const ChatMessages = () => {
       try {
         setLoading(true);
 
-        // Fetch messages from Supabase
+        // Fetch messages from Supabase - fix the join issue by doing a separate query
         const { data, error } = await supabase
           .from('chat_messages')
           .select(`
@@ -48,8 +48,7 @@ export const ChatMessages = () => {
             recipient_id,
             chat_room_id, 
             is_read,
-            created_at,
-            profiles:sender_id (username, full_name, avatar_url)
+            created_at
           `)
           .eq('chat_room_id', 'general')
           .order('created_at', { ascending: true });
@@ -59,17 +58,41 @@ export const ChatMessages = () => {
         }
 
         if (data) {
-          const formattedMessages: ChatMessage[] = data.map(msg => ({
-            id: msg.id,
-            content: msg.content,
-            sender_id: msg.sender_id,
-            recipient_id: msg.recipient_id,
-            chat_room_id: msg.chat_room_id,
-            is_read: msg.is_read,
-            created_at: msg.created_at,
-            sender_name: msg.profiles?.full_name || msg.profiles?.username || 'Unknown User',
-            sender_avatar: msg.profiles?.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${msg.sender_id}`
-          }));
+          // Get all unique sender IDs
+          const senderIds = [...new Set(data.map(msg => msg.sender_id))];
+          
+          // Fetch profile information for all senders
+          const { data: profilesData, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, username, full_name, avatar_url')
+            .in('id', senderIds);
+
+          if (profilesError) {
+            throw profilesError;
+          }
+
+          // Create a map of profiles for easy lookup
+          const profilesMap = profilesData?.reduce((acc, profile) => {
+            acc[profile.id] = profile;
+            return acc;
+          }, {} as Record<string, any>) || {};
+
+          // Map the messages with sender information
+          const formattedMessages: ChatMessage[] = data.map(msg => {
+            const senderProfile = profilesMap[msg.sender_id] || {};
+            
+            return {
+              id: msg.id,
+              content: msg.content,
+              sender_id: msg.sender_id,
+              recipient_id: msg.recipient_id,
+              chat_room_id: msg.chat_room_id,
+              is_read: msg.is_read,
+              created_at: msg.created_at,
+              sender_name: senderProfile.full_name || senderProfile.username || 'Unknown User',
+              sender_avatar: senderProfile.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${msg.sender_id}`
+            };
+          });
 
           setMessages(formattedMessages);
         }
@@ -95,7 +118,7 @@ export const ChatMessages = () => {
         table: 'chat_messages',
         filter: `chat_room_id=eq.general`
       }, async (payload) => {
-        // Get sender info
+        // Get sender info with a separate query
         const { data: senderProfile } = await supabase
           .from('profiles')
           .select('username, full_name, avatar_url')

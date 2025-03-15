@@ -26,32 +26,55 @@ export const ContactRequests = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user?.id) return;
 
+        // Get contact requests
         const { data, error } = await supabase
           .from("contact_requests")
           .select(`
             id, 
             created_at,
-            sender_id, 
-            profiles:sender_id (id, username, avatar_url)
+            sender_id
           `)
           .eq("recipient_id", user.id)
           .eq("status", "pending");
 
         if (error) throw error;
         
-        if (data) {
+        if (data && data.length > 0) {
+          // Get all unique sender IDs
+          const senderIds = data.map(req => req.sender_id);
+          
+          // Fetch profile information for all senders separately
+          const { data: profilesData, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url')
+            .in('id', senderIds);
+
+          if (profilesError) throw profilesError;
+
+          // Create a map of profiles for easy lookup
+          const profilesMap = profilesData?.reduce((acc, profile) => {
+            acc[profile.id] = profile;
+            return acc;
+          }, {} as Record<string, any>) || {};
+
           // Transform the data to match our interface
-          const formattedRequests: ContactRequest[] = data.map(req => ({
-            id: req.id,
-            created_at: req.created_at,
-            sender: {
-              id: req.sender_id,
-              username: req.profiles?.username || 'Unknown User',
-              avatar_url: req.profiles?.avatar_url || '',
-            }
-          }));
+          const formattedRequests: ContactRequest[] = data.map(req => {
+            const senderProfile = profilesMap[req.sender_id] || {};
+            
+            return {
+              id: req.id,
+              created_at: req.created_at,
+              sender: {
+                id: req.sender_id,
+                username: senderProfile.username || 'Unknown User',
+                avatar_url: senderProfile.avatar_url || '',
+              }
+            };
+          });
 
           setRequests(formattedRequests);
+        } else {
+          setRequests([]);
         }
       } catch (error) {
         console.error("Error fetching requests:", error);
