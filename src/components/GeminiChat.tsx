@@ -32,7 +32,7 @@ export const GeminiChat = () => {
       setMessages([
         {
           role: "assistant",
-          content: "Hello! I'm your Gemini AI assistant. How can I help you today?",
+          content: "Hello! I'm your Gemini AI assistant (using the free version). How can I help you today?",
           timestamp: new Date(),
         },
       ]);
